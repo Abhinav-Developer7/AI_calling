@@ -5,7 +5,7 @@ import { CallAttempt } from '../models/CallAttempt.js';
 
 export async function listFeedback(req, res, next) {
   try {
-    const { rating, sentiment, search, page = 1, limit = 20 } = req.query;
+    const { rating, sentiment, language, search, page = 1, limit = 5 } = req.query;
 
     const query = {};
 
@@ -17,8 +17,34 @@ export async function listFeedback(req, res, next) {
       query.sentiment = sentiment;
     }
 
-    const pageNum = parseInt(page, 10);
-    const limitNum = parseInt(limit, 10);
+    if (language && language !== 'all') {
+      query.language = language;
+    }
+
+    if (search && search.trim()) {
+      const term = search.trim();
+      const matchingPurchases = await Purchase.find({
+        $or: [
+          { invoiceNumber: { $regex: term, $options: 'i' } },
+          { customerName: { $regex: term, $options: 'i' } },
+          { phoneNumber: { $regex: term, $options: 'i' } },
+          { normalizedPhoneNumber: { $regex: term, $options: 'i' } },
+        ],
+      }).select('_id');
+
+      const matchingProcesses = await FeedbackProcess.find({
+        purchaseId: { $in: matchingPurchases.map((p) => p._id) },
+      }).select('_id');
+
+      query.$or = [
+        { feedbackProcessId: { $in: matchingProcesses.map((p) => p._id) } },
+        { summaryText: { $regex: term, $options: 'i' } },
+        { customerComments: { $regex: term, $options: 'i' } },
+      ];
+    }
+
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.max(1, parseInt(limit, 10) || 5);
     const skip = (pageNum - 1) * limitNum;
 
     const [feedbacks, total] = await Promise.all([
@@ -80,6 +106,44 @@ export async function getFeedback(req, res, next) {
         callAttempt: feedback.callAttemptId || null,
       },
     });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function streamFeedbackRecording(req, res, next) {
+  try {
+    const feedback = await Feedback.findById(req.params.id);
+    if (!feedback || !feedback.recordingUrl) {
+      return res.status(404).json({ success: false, message: 'Audio recording not found' });
+    }
+
+    const recordingUrl = feedback.recordingUrl;
+
+    const rangeHeader = req.headers.range;
+    const fetchHeaders = {};
+    if (rangeHeader) {
+      fetchHeaders.Range = rangeHeader;
+    }
+
+    const audioResponse = await fetch(recordingUrl, { headers: fetchHeaders });
+
+    res.status(audioResponse.status);
+
+    ['content-range', 'content-length', 'content-type', 'accept-ranges'].forEach((h) => {
+      const val = audioResponse.headers.get(h);
+      if (val) res.setHeader(h, val);
+    });
+
+    if (!audioResponse.headers.get('content-type')) {
+      res.setHeader('content-type', 'audio/mpeg');
+    }
+    if (!audioResponse.headers.get('accept-ranges')) {
+      res.setHeader('accept-ranges', 'bytes');
+    }
+
+    const arrayBuffer = await audioResponse.arrayBuffer();
+    return res.end(Buffer.from(arrayBuffer));
   } catch (error) {
     next(error);
   }

@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
+import mongoSanitize from 'express-mongo-sanitize';
 import { errorHandler } from './middleware/errorHandler.js';
 import { apiLimiter } from './middleware/rateLimiter.js';
 import authRoutes from './routes/authRoutes.js';
@@ -13,6 +14,7 @@ import feedbackRoutes from './routes/feedbackRoutes.js';
 import complaintRoutes from './routes/complaintRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
+import settingsRoutes from './routes/settingsRoutes.js';
 
 export const app = express();
 
@@ -30,6 +32,7 @@ app.use(
 app.use(cookieParser());
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+app.use(mongoSanitize());
 
 // Health check endpoint
 app.get('/api/v1/health', (req, res) => {
@@ -53,6 +56,7 @@ app.use('/api/v1/feedback', feedbackRoutes);
 app.use('/api/v1/complaints', complaintRoutes);
 app.use('/api/v1/dashboard', dashboardRoutes);
 app.use('/api/v1/reports', reportRoutes);
+app.use('/api/v1/settings', settingsRoutes);
 
 // Centralized error handler
 app.use(errorHandler);

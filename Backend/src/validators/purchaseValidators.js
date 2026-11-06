@@ -22,8 +22,8 @@ export const listPurchasesSchema = z.object({
   query: z.object({
     search: z.string().optional(),
     branchId: z.string().optional(),
-    page: z.string().optional().transform((val) => (val ? parseInt(val, 10) : 1)),
-    limit: z.string().optional().transform((val) => (val ? parseInt(val, 10) : 20)),
+    page: z.union([z.string(), z.number()]).optional().transform((val) => (val ? parseInt(String(val), 10) : 1)),
+    limit: z.union([z.string(), z.number()]).optional().transform((val) => (val ? parseInt(String(val), 10) : 5)),
     startDate: z.string().optional(),
     endDate: z.string().optional(),
   }),

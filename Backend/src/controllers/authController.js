@@ -28,14 +28,29 @@ export async function login(req, res, next) {
       });
     }
 
+    if (user.lockUntil && user.lockUntil > new Date()) {
+      const waitMinutes = Math.ceil((user.lockUntil.getTime() - Date.now()) / (60 * 1000));
+      return res.status(429).json({
+        success: false,
+        message: `Account temporarily locked due to repeated failed attempts. Please retry in ${waitMinutes} minute(s).`,
+      });
+    }
+
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
+      user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
+      if (user.failedLoginAttempts >= 5) {
+        user.lockUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 min lock
+      }
+      await user.save();
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password.',
       });
     }
 
+    user.failedLoginAttempts = 0;
+    user.lockUntil = null;
     user.lastLoginAt = new Date();
     await user.save();
 

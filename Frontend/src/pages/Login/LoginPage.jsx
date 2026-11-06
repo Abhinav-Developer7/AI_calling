@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Gem, Lock, Mail, AlertCircle } from 'lucide-react';
+import { Lock, Mail, AlertCircle } from 'lucide-react';
 
 export function LoginPage() {
   const [email, setEmail] = useState('');
@@ -21,61 +21,61 @@ export function LoginPage() {
       await login(email, password);
       navigate('/');
     } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Login failed. Please check your credentials.');
+      setError(err.response?.data?.message || err.message || 'Login failed. Please verify credentials.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-900 px-4">
-      <div className="max-w-md w-full bg-slate-800 rounded-2xl shadow-2xl p-8 border border-slate-700">
-        <div className="flex flex-col items-center mb-8">
-          <div className="p-3 bg-amber-500/10 rounded-2xl border border-amber-500/20 mb-3 text-amber-400">
-            <Gem className="w-8 h-8" />
+    <div className="min-h-screen flex items-center justify-center bg-app px-4 font-sans text-ink">
+      <div className="max-w-sm w-full bg-surface rounded-[28px] md:rounded-[32px] shadow-soft p-8 border border-black/[0.04] dark:border-white/[0.06]">
+        <div className="flex flex-col items-center mb-6">
+          <div className="w-12 h-12 rounded-full bg-accent/20 text-accent-ink flex items-center justify-center font-bold text-sm tracking-wider mb-3 shadow-soft">
+            AJ
           </div>
-          <h1 className="text-2xl font-bold text-white tracking-wide">Aurum Jewellery</h1>
-          <p className="text-xs text-slate-400 mt-1">AI Voice Customer Feedback Calling Portal</p>
+          <h1 className="text-lg font-bold text-ink tracking-tight">Aurum Jewellery</h1>
+          <p className="text-xs text-ink-soft mt-0.5">Post-Purchase Feedback Portal</p>
         </div>
 
         {error && (
-          <div className="mb-6 p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-3 text-red-400 text-sm">
-            <AlertCircle className="w-5 h-5 shrink-0" />
+          <div className="mb-4 p-3.5 bg-status-danger-bg border border-rose-500/20 rounded-2xl flex items-center gap-2.5 text-status-danger-ink text-xs shadow-soft font-medium">
+            <AlertCircle className="w-4 h-4 shrink-0 stroke-[2]" />
             <span>{error}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">
+            <label className="block text-[11px] font-medium text-ink-soft mb-1.5 ml-1">
               Email Address
             </label>
             <div className="relative">
-              <Mail className="w-5 h-5 absolute left-3 top-3 text-slate-500" />
+              <Mail className="w-4 h-4 absolute left-3.5 top-3 text-ink-soft stroke-[1.75]" />
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@jewellery.com"
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                placeholder="admin@aurumjewellery.com"
+                className="w-full bg-surface-muted border border-black/[0.04] dark:border-white/[0.06] rounded-pill pl-10 pr-4 py-2.5 text-xs text-ink placeholder-ink-soft/40 focus:outline-none focus:ring-1 focus:ring-accent"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">
+            <label className="block text-[11px] font-medium text-ink-soft mb-1.5 ml-1">
               Password
             </label>
             <div className="relative">
-              <Lock className="w-5 h-5 absolute left-3 top-3 text-slate-500" />
+              <Lock className="w-4 h-4 absolute left-3.5 top-3 text-ink-soft stroke-[1.75]" />
               <input
                 type="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                className="w-full bg-surface-muted border border-black/[0.04] dark:border-white/[0.06] rounded-pill pl-10 pr-4 py-2.5 text-xs text-ink placeholder-ink-soft/40 focus:outline-none focus:ring-1 focus:ring-accent"
               />
             </div>
           </div>
@@ -83,24 +83,23 @@ export function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full mt-2 py-3 px-4 bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold rounded-lg shadow-md transition disabled:opacity-50 text-sm flex items-center justify-center gap-2"
+            className="w-full mt-2 py-3 px-4 bg-accent text-accent-ink font-semibold rounded-pill shadow-soft hover:brightness-105 active:scale-[0.98] transition disabled:opacity-50 text-xs flex items-center justify-center gap-2 cursor-pointer"
           >
             {loading ? (
               <>
-                <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin"></div>
-                Signing in...
+                <div className="w-3.5 h-3.5 border-2 border-accent-ink border-t-transparent rounded-full animate-spin" />
+                <span>Signing in...</span>
               </>
             ) : (
-              'Sign In to Dashboard'
+              'Sign In'
             )}
           </button>
         </form>
 
-        <div className="mt-8 pt-6 border-t border-slate-700/60 text-center">
-          <p className="text-xs text-slate-500">Authorized jewellery administrative personnel only.</p>
+        <div className="mt-6 pt-4 border-t border-black/[0.04] dark:border-white/[0.06] text-center">
+          <p className="text-[11px] text-ink-soft">Authorized showroom personnel only.</p>
         </div>
       </div>
     </div>
   );
 }
-

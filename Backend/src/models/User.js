@@ -33,6 +33,13 @@ const userSchema = new mongoose.Schema(
     lastLoginAt: {
       type: Date,
     },
+    failedLoginAttempts: {
+      type: Number,
+      default: 0,
+    },
+    lockUntil: {
+      type: Date,
+    },
   },
   {
     timestamps: true,

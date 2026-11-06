@@ -18,6 +18,11 @@ const purchaseSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    customerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Customer',
+      index: true,
+    },
     customerName: {
       type: String,
       required: true,

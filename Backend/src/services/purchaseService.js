@@ -1,7 +1,9 @@
 import { Purchase } from '../models/Purchase.js';
+import { Customer } from '../models/Customer.js';
 import { FeedbackProcess, CallStatus, FeedbackStatus } from '../models/FeedbackProcess.js';
 import { OptOutRegistry } from '../models/OptOutRegistry.js';
 import { normalizePhoneNumber } from '../utils/phone.js';
+import { toTitleCase } from '../utils/string.js';
 import { scheduleFeedbackCallJob } from '../queues/callingQueue.js';
 import { executeCallAttempt } from './callingService.js';
 import { env } from '../config/env.js';
@@ -53,16 +55,47 @@ export async function createPurchaseAndSchedule({
   // 4. Opt-Out Suppression Check
   const isOptedOut = await OptOutRegistry.exists({ normalizedPhoneNumber });
 
-  // 5. Create Purchase record
+  // 5. Deduplicate and normalize Customer record
+  const properName = toTitleCase(customerName) || 'Customer';
+  const purchaseDateObj = new Date(purchaseDate);
+  const purchaseAmountNum = Number(totalAmount) || 0;
+
+  let customer = await Customer.findOne({ normalizedPhoneNumber });
+  if (!customer) {
+    customer = await Customer.create({
+      normalizedPhoneNumber,
+      name: properName,
+      originalPhoneNumber: phoneNumber,
+      firstPurchaseDate: purchaseDateObj,
+      lastPurchaseDate: purchaseDateObj,
+      totalPurchasesCount: 1,
+      totalSpent: purchaseAmountNum,
+      isOptedOut: Boolean(isOptedOut),
+    });
+  } else {
+    customer.lastPurchaseDate = purchaseDateObj;
+    customer.totalPurchasesCount += 1;
+    customer.totalSpent += purchaseAmountNum;
+    if (properName && properName !== 'Customer') {
+      customer.name = properName;
+    }
+    if (isOptedOut) {
+      customer.isOptedOut = true;
+    }
+    await customer.save();
+  }
+
+  // 6. Create Purchase record linked to parent Customer
   const purchase = await Purchase.create({
+    customerId: customer._id,
     source,
     externalPurchaseId: resolvedExternalId,
     invoiceNumber,
-    customerName,
+    customerName: customer.name,
     phoneNumber,
     normalizedPhoneNumber,
-    purchaseDate: new Date(purchaseDate),
-    totalAmount,
+    purchaseDate: purchaseDateObj,
+    totalAmount: purchaseAmountNum,
     currency,
     itemsSummary,
     branchId,
@@ -144,7 +177,7 @@ export async function getPurchasesList({
   search = '',
   branchId,
   page = 1,
-  limit = 20,
+  limit = 5,
   startDate,
   endDate,
 }) {
@@ -170,10 +203,12 @@ export async function getPurchasesList({
     if (endDate) query.purchaseDate.$lte = new Date(endDate);
   }
 
-  const skip = (page - 1) * limit;
+  const pageNum = Math.max(1, parseInt(page, 10) || 1);
+  const limitNum = Math.max(1, parseInt(limit, 10) || 5);
+  const skip = (pageNum - 1) * limitNum;
 
   const [purchases, total] = await Promise.all([
-    Purchase.find(query).sort({ purchaseDate: -1, createdAt: -1 }).skip(skip).limit(limit).lean(),
+    Purchase.find(query).sort({ purchaseDate: -1, createdAt: -1 }).skip(skip).limit(limitNum).lean(),
     Purchase.countDocuments(query),
   ]);
 
@@ -191,9 +226,9 @@ export async function getPurchasesList({
     purchases: enrichedPurchases,
     pagination: {
       total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit) || 1,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum) || 1,
     },
   };
 }

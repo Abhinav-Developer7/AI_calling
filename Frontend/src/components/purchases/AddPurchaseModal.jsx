@@ -1,357 +1,341 @@
 import React, { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { apiClient } from '../../api/client';
-import { X, Plus, AlertCircle, CheckCircle, Sparkles, Clock } from 'lucide-react';
+import { X, AlertCircle, CheckCircle, Clock, RefreshCw } from 'lucide-react';
+
+const purchaseFormSchema = z.object({
+  invoiceNumber: z.string().min(1, 'Invoice number is required'),
+  customerName: z.string().min(2, 'Customer name must be at least 2 characters'),
+  phoneNumber: z.string().min(10, 'Valid 10+ digit phone number is required'),
+  totalAmount: z.coerce.number().positive('Amount must be positive'),
+  itemsSummary: z.string().min(2, 'Purchased items description is required'),
+  branchId: z.string().min(1, 'Branch selection is required'),
+  feedbackCallConsent: z.boolean(),
+  delayOption: z.enum(['0', '15', 'custom']),
+  customDelay: z.coerce.number().optional(),
+});
 
 export function AddPurchaseModal({ isOpen, onClose, onPurchaseCreated }) {
-  const generateRandomInvoice = () => `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+  const generateRandomInvoice = () =>
+    `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
-  const [formData, setFormData] = useState({
-    invoiceNumber: generateRandomInvoice(),
-    customerName: '',
-    phoneNumber: '',
-    totalAmount: '',
-    itemsSummary: '',
-    branchId: 'Ernakulam Main Store',
-    feedbackCallConsent: true,
-    delayOption: '0', // Default to Immediate (0) for instant automatic calling
-    customDelay: '5',
+  const [serverError, setServerError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    reset,
+    formState: { errors },
+  } = useForm({
+    resolver: zodResolver(purchaseFormSchema),
+    defaultValues: {
+      invoiceNumber: generateRandomInvoice(),
+      customerName: '',
+      phoneNumber: '',
+      totalAmount: '',
+      itemsSummary: '',
+      branchId: 'Ernakulam Flagship Store',
+      feedbackCallConsent: true,
+      delayOption: '0',
+      customDelay: 5,
+    },
   });
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
+  const delayOption = watch('delayOption');
 
   if (!isOpen) return null;
 
-  const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value,
-    }));
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
+  const onSubmit = async (data) => {
+    setServerError('');
     setSuccessMsg('');
-    setLoading(true);
+    setSubmitting(true);
 
     try {
       const delayMinutes =
-        formData.delayOption === '0'
+        data.delayOption === '0'
           ? 0
-          : formData.delayOption === 'custom'
-          ? parseInt(formData.customDelay, 10) || 15
+          : data.delayOption === 'custom'
+          ? parseInt(data.customDelay, 10) || 15
           : 15;
 
       const payload = {
         source: 'manual_entry',
-        invoiceNumber: formData.invoiceNumber.trim(),
-        customerName: formData.customerName.trim(),
-        phoneNumber: formData.phoneNumber.trim(),
-        totalAmount: parseFloat(formData.totalAmount) || 0,
-        itemsSummary: formData.itemsSummary.trim(),
-        branchId: formData.branchId,
-        feedbackCallConsent: formData.feedbackCallConsent,
+        invoiceNumber: data.invoiceNumber.trim(),
+        customerName: data.customerName.trim(),
+        phoneNumber: data.phoneNumber.trim(),
+        totalAmount: data.totalAmount,
+        itemsSummary: data.itemsSummary.trim(),
+        branchId: data.branchId,
+        feedbackCallConsent: data.feedbackCallConsent,
         customDelayMinutes: delayMinutes,
         purchaseDate: new Date().toISOString(),
       };
 
       const res = await apiClient.post('/purchases', payload);
 
-      if (res.data.success) {
+      if (res.data?.success) {
         if (res.data.duplicate) {
-          setError(`Notice: Bill with invoice #${payload.invoiceNumber} already exists in the system.`);
+          setServerError(`Bill with invoice #${payload.invoiceNumber} already exists in the system.`);
         } else {
           const successText =
             delayMinutes === 0
-              ? `Bill saved! AI calling agent is placing call to ${payload.customerName} now...`
-              : `Bill saved! Feedback call scheduled for: ${new Date(res.data.scheduledAt).toLocaleTimeString([], {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}`;
+              ? `Saved. Automated feedback call queued for ${payload.customerName}.`
+              : `Saved. Feedback call scheduled for 15 minutes after billing.`;
           setSuccessMsg(successText);
           if (onPurchaseCreated) {
             onPurchaseCreated(res.data.purchase);
           }
           setTimeout(() => {
+            reset();
             onClose();
-          }, 1500);
+          }, 1200);
         }
       }
     } catch (err) {
       const msg = err.response?.data?.message || err.response?.data?.errors?.[0]?.message || err.message;
-      setError(msg || 'Failed to save purchase bill.');
+      setServerError(msg || 'Failed to record purchase bill.');
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-        {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 bg-slate-900 text-white border-b border-slate-800">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-amber-500/20 text-amber-400 rounded-lg">
-              <Plus className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-sm">Add Manual Purchase Bill</h3>
-              <p className="text-[11px] text-slate-400">Test post-purchase AI calling workflow</p>
-            </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4 overflow-y-auto font-sans">
+      <div className="bg-surface rounded-[28px] md:rounded-[32px] border border-black/[0.04] dark:border-white/[0.06] shadow-2xl w-full max-w-lg overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-5 border-b border-black/[0.04] dark:border-white/[0.06]">
+          <div>
+            <h2 className="font-bold text-base text-ink tracking-tight">New Purchase Bill</h2>
+            <p className="text-xs text-ink-soft mt-0.5">Record transaction and trigger feedback scheduling</p>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            aria-label="Close dialog"
+            className="p-2 rounded-full bg-surface-muted hover:bg-black/5 dark:hover:bg-white/5 text-ink transition cursor-pointer"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4 stroke-[1.75]" />
           </button>
         </div>
 
-        {/* Modal Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {error && (
-            <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{error}</span>
+        {/* Form */}
+        <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4 text-xs">
+          {serverError && (
+            <div className="p-3.5 bg-status-danger-bg border border-rose-500/20 text-status-danger-ink rounded-2xl flex items-center gap-2.5 text-xs font-medium shadow-soft">
+              <AlertCircle className="w-4 h-4 shrink-0 stroke-[2]" />
+              <span>{serverError}</span>
             </div>
           )}
 
           {successMsg && (
-            <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-xs flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 shrink-0" />
+            <div className="p-3.5 bg-status-success-bg border border-emerald-500/20 text-status-success-ink rounded-2xl flex items-center gap-2.5 text-xs font-medium shadow-soft">
+              <CheckCircle className="w-4 h-4 shrink-0 stroke-[2]" />
               <span>{successMsg}</span>
             </div>
           )}
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-[11px] font-medium text-ink-soft mb-1.5">
                 Invoice Number *
               </label>
-              <div className="flex gap-1">
+              <div className="flex gap-2">
                 <input
                   type="text"
-                  required
-                  name="invoiceNumber"
-                  value={formData.invoiceNumber}
-                  onChange={handleInputChange}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-amber-500 font-mono"
+                  {...register('invoiceNumber')}
+                  className="w-full bg-surface-muted border border-black/[0.04] dark:border-white/[0.06] rounded-xl px-3.5 py-2 text-xs text-ink font-mono focus:outline-none focus:ring-1 focus:ring-accent"
                 />
                 <button
                   type="button"
-                  title="Generate new invoice number"
-                  onClick={() => setFormData((p) => ({ ...p, invoiceNumber: generateRandomInvoice() }))}
-                  className="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-600 text-xs"
+                  title="Generate invoice"
+                  onClick={() => setValue('invoiceNumber', generateRandomInvoice())}
+                  className="p-2.5 bg-surface-muted hover:bg-black/5 dark:hover:bg-white/5 rounded-xl text-ink transition cursor-pointer"
                 >
-                  <Sparkles className="w-3.5 h-3.5" />
+                  <RefreshCw className="w-3.5 h-3.5" />
                 </button>
               </div>
+              {errors.invoiceNumber && (
+                <p className="text-status-danger-ink text-[10px] mt-1 font-medium">{errors.invoiceNumber.message}</p>
+              )}
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Branch / Store Location
+              <label className="block text-[11px] font-medium text-ink-soft mb-1.5">
+                Branch Location
               </label>
               <select
-                name="branchId"
-                value={formData.branchId}
-                onChange={handleInputChange}
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-amber-500"
+                {...register('branchId')}
+                className="w-full bg-surface-muted border border-black/[0.04] dark:border-white/[0.06] rounded-xl px-3.5 py-2 text-xs text-ink focus:outline-none focus:ring-1 focus:ring-accent cursor-pointer"
               >
-                <option value="Ernakulam Main Store">Ernakulam Main Store</option>
-                <option value="Thrissur Branch">Thrissur Branch</option>
-                <option value="Kozhikode Branch">Kozhikode Branch</option>
-                <option value="Trivandrum Branch">Trivandrum Branch</option>
+                <option value="Ernakulam Flagship Store">Ernakulam Flagship Store</option>
+                <option value="Thrissur Store">Thrissur Store</option>
+                <option value="Kozhikode Store">Kozhikode Store</option>
               </select>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-[11px] font-medium text-ink-soft mb-1.5">
                 Customer Name *
               </label>
               <input
                 type="text"
-                required
-                name="customerName"
                 placeholder="e.g. Sreejith Varma"
-                value={formData.customerName}
-                onChange={handleInputChange}
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-amber-500"
+                {...register('customerName')}
+                className="w-full bg-surface-muted border border-black/[0.04] dark:border-white/[0.06] rounded-xl px-3.5 py-2 text-xs text-ink placeholder-ink-soft/40 focus:outline-none focus:ring-1 focus:ring-accent"
               />
+              {errors.customerName && (
+                <p className="text-status-danger-ink text-[10px] mt-1 font-medium">{errors.customerName.message}</p>
+              )}
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-[11px] font-medium text-ink-soft mb-1.5">
                 Customer Phone Number *
               </label>
               <input
                 type="text"
-                required
-                name="phoneNumber"
                 placeholder="e.g. +91 98765 43210"
-                value={formData.phoneNumber}
-                onChange={handleInputChange}
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-amber-500 font-mono"
+                {...register('phoneNumber')}
+                className="w-full bg-surface-muted border border-black/[0.04] dark:border-white/[0.06] rounded-xl px-3.5 py-2 text-xs text-ink font-mono placeholder-ink-soft/40 focus:outline-none focus:ring-1 focus:ring-accent"
               />
+              {errors.phoneNumber && (
+                <p className="text-status-danger-ink text-[10px] mt-1 font-medium">{errors.phoneNumber.message}</p>
+              )}
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-[11px] font-medium text-ink-soft mb-1.5">
                 Total Amount (INR) *
               </label>
               <input
                 type="number"
-                required
-                min="0"
-                step="1"
-                name="totalAmount"
                 placeholder="e.g. 75000"
-                value={formData.totalAmount}
-                onChange={handleInputChange}
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-amber-500"
+                {...register('totalAmount')}
+                className="w-full bg-surface-muted border border-black/[0.04] dark:border-white/[0.06] rounded-xl px-3.5 py-2 text-xs text-ink tabular-nums placeholder-ink-soft/40 focus:outline-none focus:ring-1 focus:ring-accent"
               />
+              {errors.totalAmount && (
+                <p className="text-status-danger-ink text-[10px] mt-1 font-medium">{errors.totalAmount.message}</p>
+              )}
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Purchased Jewellery Items *
+              <label className="block text-[11px] font-medium text-ink-soft mb-1.5">
+                Items Summary *
               </label>
               <input
                 type="text"
-                required
-                name="itemsSummary"
-                placeholder="e.g. Gold Necklace 22k 16g"
-                value={formData.itemsSummary}
-                onChange={handleInputChange}
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-amber-500"
+                placeholder="e.g. Gold Necklace 22K 16g"
+                {...register('itemsSummary')}
+                className="w-full bg-surface-muted border border-black/[0.04] dark:border-white/[0.06] rounded-xl px-3.5 py-2 text-xs text-ink placeholder-ink-soft/40 focus:outline-none focus:ring-1 focus:ring-accent"
               />
+              {errors.itemsSummary && (
+                <p className="text-status-danger-ink text-[10px] mt-1 font-medium">{errors.itemsSummary.message}</p>
+              )}
             </div>
           </div>
 
-          {/* Testing Call Delay Option */}
-          <div className="p-3 bg-amber-50/60 border border-amber-200/80 rounded-xl space-y-2">
-            <div className="flex items-center gap-2 text-xs font-semibold text-amber-900">
-              <Clock className="w-4 h-4 text-amber-600" />
-              <span>Feedback Call Schedule Timing</span>
+          {/* Schedule Timing Options */}
+          <div className="p-4 bg-surface-muted rounded-[20px] border border-black/[0.04] dark:border-white/[0.06] space-y-2.5">
+            <div className="flex items-center gap-2 text-xs font-semibold text-ink">
+              <Clock className="w-3.5 h-3.5 text-ink-soft stroke-[2]" />
+              <span>Feedback Call Timing</span>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 text-xs">
+            <div className="grid grid-cols-3 gap-2">
               <label
-                className={`flex items-center gap-1.5 p-2 rounded-lg border cursor-pointer transition ${
-                  formData.delayOption === '15'
-                    ? 'bg-amber-500 text-slate-950 font-semibold border-amber-600'
-                    : 'bg-white text-slate-700 border-slate-200'
+                className={`flex items-center justify-center py-2 px-3 rounded-pill cursor-pointer text-xs font-semibold transition ${
+                  delayOption === '15'
+                    ? 'bg-accent text-accent-ink shadow-soft'
+                    : 'bg-surface text-ink-soft hover:text-ink'
                 }`}
               >
-                <input
-                  type="radio"
-                  name="delayOption"
-                  value="15"
-                  checked={formData.delayOption === '15'}
-                  onChange={handleInputChange}
-                  className="hidden"
-                />
-                <span>15 Mins (Default)</span>
+                <input type="radio" value="15" {...register('delayOption')} className="hidden" />
+                <span>15 Mins</span>
               </label>
 
               <label
-                className={`flex items-center gap-1.5 p-2 rounded-lg border cursor-pointer transition ${
-                  formData.delayOption === '0'
-                    ? 'bg-amber-500 text-slate-950 font-semibold border-amber-600'
-                    : 'bg-white text-slate-700 border-slate-200'
+                className={`flex items-center justify-center py-2 px-3 rounded-pill cursor-pointer text-xs font-semibold transition ${
+                  delayOption === '0'
+                    ? 'bg-accent text-accent-ink shadow-soft'
+                    : 'bg-surface text-ink-soft hover:text-ink'
                 }`}
               >
-                <input
-                  type="radio"
-                  name="delayOption"
-                  value="0"
-                  checked={formData.delayOption === '0'}
-                  onChange={handleInputChange}
-                  className="hidden"
-                />
-                <span>Immediate (Test)</span>
+                <input type="radio" value="0" {...register('delayOption')} className="hidden" />
+                <span>Immediate</span>
               </label>
 
               <label
-                className={`flex items-center gap-1.5 p-2 rounded-lg border cursor-pointer transition ${
-                  formData.delayOption === 'custom'
-                    ? 'bg-amber-500 text-slate-950 font-semibold border-amber-600'
-                    : 'bg-white text-slate-700 border-slate-200'
+                className={`flex items-center justify-center py-2 px-3 rounded-pill cursor-pointer text-xs font-semibold transition ${
+                  delayOption === 'custom'
+                    ? 'bg-accent text-accent-ink shadow-soft'
+                    : 'bg-surface text-ink-soft hover:text-ink'
                 }`}
               >
-                <input
-                  type="radio"
-                  name="delayOption"
-                  value="custom"
-                  checked={formData.delayOption === 'custom'}
-                  onChange={handleInputChange}
-                  className="hidden"
-                />
-                <span>Custom Delay</span>
+                <input type="radio" value="custom" {...register('delayOption')} className="hidden" />
+                <span>Custom</span>
               </label>
             </div>
 
-            {formData.delayOption === 'custom' && (
+            {delayOption === 'custom' && (
               <div className="flex items-center gap-2 pt-1">
                 <input
                   type="number"
                   min="1"
                   max="120"
-                  name="customDelay"
-                  value={formData.customDelay}
-                  onChange={handleInputChange}
-                  className="w-20 bg-white border border-slate-200 rounded p-1 text-xs text-slate-800"
+                  {...register('customDelay')}
+                  className="w-16 bg-surface border border-black/[0.04] dark:border-white/[0.06] rounded-xl px-2.5 py-1 text-xs text-ink font-semibold tabular-nums"
                 />
-                <span className="text-xs text-slate-600">minutes after purchase</span>
+                <span className="text-ink-soft text-[11px]">minutes delay after billing</span>
               </div>
             )}
           </div>
 
-          {/* Feedback Consent Checkbox */}
-          <div className="pt-1">
+          {/* Consent Checkbox */}
+          <div className="px-1">
             <label className="flex items-start gap-2.5 cursor-pointer">
               <input
                 type="checkbox"
-                name="feedbackCallConsent"
-                checked={formData.feedbackCallConsent}
-                onChange={handleInputChange}
-                className="mt-0.5 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                {...register('feedbackCallConsent')}
+                className="mt-0.5 rounded accent-accent"
               />
-              <span className="text-xs text-slate-600">
-                Customer provided explicit consent to receive a feedback call for this purchase (unchecking will set status to <span className="font-semibold text-slate-800">skipped</span>).
+              <span className="text-[11px] text-ink-soft leading-relaxed">
+                Customer provided explicit consent to receive a feedback call. (Unchecking marks record as skipped).
               </span>
             </label>
           </div>
 
-          {/* Actions */}
-          <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
+          {/* Modal Actions */}
+          <div className="pt-4 border-t border-black/[0.04] dark:border-white/[0.06] flex items-center justify-end gap-2.5">
             <button
               type="button"
               onClick={onClose}
-              disabled={loading}
-              className="px-4 py-2 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 transition"
+              disabled={submitting}
+              className="px-4 py-2 rounded-pill text-xs font-semibold text-ink-soft hover:text-ink hover:bg-surface-muted transition cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={loading}
-              className="px-5 py-2 rounded-lg text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-slate-950 shadow transition flex items-center gap-1.5 disabled:opacity-50"
+              disabled={submitting}
+              className="px-6 py-2.5 rounded-pill text-xs font-semibold bg-accent text-accent-ink shadow-soft hover:brightness-105 active:scale-[0.98] transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
-              {loading ? (
+              {submitting ? (
                 <>
-                  <div className="w-3.5 h-3.5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin"></div>
-                  Saving Bill...
+                  <div className="w-3.5 h-3.5 border-2 border-accent-ink border-t-transparent rounded-full animate-spin" />
+                  <span>Saving...</span>
                 </>
               ) : (
-                'Save & Schedule Call'
+                'Save & Schedule'
               )}
             </button>
           </div>
@@ -360,4 +344,3 @@ export function AddPurchaseModal({ isOpen, onClose, onPurchaseCreated }) {
     </div>
   );
 }
-

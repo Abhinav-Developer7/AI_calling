@@ -2,9 +2,126 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-  background-color: #f8fafc;
+:root {
+  /* Surfaces & Canvas (Light Theme Default) */
+  --bg-app: #f3f3f2;
+  --surface: #ffffff;
+  --surface-muted: #eaeae8;
+  --surface-elevated: #f8f8f6;
+
+  /* Ink & Typography */
+  --ink: #2f2f2f;
+  --ink-secondary: #4b4b4b;
+  --ink-soft: #6b6b6b;
+
+  /* Shell & Structure */
+  --frame: #3a3a3a;
+  --frame-dark: #2a2a2e;
+  --frame-active: #484a52;
+
+  /* Brand Accent: Soft Champagne Gold */
+  --accent: #e4c77a;
+  --accent-hover: #dac06e;
+  --accent-soft: rgba(228, 199, 122, 0.18);
+  --accent-ink: #242424;
+
+  /* Status Pastel Pairs (Color + Text WCAG AA compliant) */
+  --status-success-bg: #e7f6ec;
+  --status-success-ink: #166534;
+  --status-neutral-bg: #f1f1f0;
+  --status-neutral-ink: #525252;
+  --status-danger-bg: #fee8e8;
+  --status-danger-ink: #b91c1c;
+  --status-info-bg: #eaf1fb;
+  --status-info-ink: #1e40af;
+  --status-warning-bg: #fef3c7;
+  --status-warning-ink: #92400e;
+
+  /* Radius Scale */
+  --radius-sm: 12px;
+  --radius-md: 20px;
+  --radius-lg: 24px;
+  --radius-pill: 9999px;
+
+  /* Soft Low-Opacity Shadows (Never glows) */
+  --shadow-soft: 0 4px 20px -2px rgba(0, 0, 0, 0.03), 0 2px 6px -1px rgba(0, 0, 0, 0.02);
+  --shadow-hover: 0 8px 24px -4px rgba(0, 0, 0, 0.06);
 }
 
+html.dark {
+  --bg-app: #18191d;
+  --surface: #222329;
+  --surface-muted: #2c2d35;
+  --surface-elevated: #282930;
+
+  --ink: #f5f5f7;
+  --ink-secondary: #d1d1d6;
+  --ink-soft: #8e8e93;
+
+  --frame: #121316;
+  --frame-dark: #0e0f12;
+  --frame-active: #2a2b33;
+
+  --accent: #e4c77a;
+  --accent-hover: #f0d588;
+  --accent-soft: rgba(228, 199, 122, 0.15);
+  --accent-ink: #16171b;
+
+  --status-success-bg: rgba(16, 185, 129, 0.15);
+  --status-success-ink: #34d399;
+  --status-neutral-bg: rgba(255, 255, 255, 0.08);
+  --status-neutral-ink: #9ca3af;
+  --status-danger-bg: rgba(239, 68, 68, 0.15);
+  --status-danger-ink: #f87171;
+  --status-info-bg: rgba(59, 130, 246, 0.15);
+  --status-info-ink: #60a5fa;
+  --status-warning-bg: rgba(245, 158, 11, 0.15);
+  --status-warning-ink: #fbbf24;
+
+  --shadow-soft: 0 4px 20px -2px rgba(0, 0, 0, 0.35);
+  --shadow-hover: 0 8px 24px -4px rgba(0, 0, 0, 0.45);
+}
+
+@layer base {
+  body {
+    background-color: var(--frame);
+    color: var(--ink);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Malayalam typography rendering */
+  [lang="ml"], .font-malayalam {
+    font-family: 'Noto Sans Malayalam', 'Inter', sans-serif;
+    line-height: 1.7;
+    letter-spacing: 0.01em;
+  }
+
+  /* Tabular figures for all numerical data & metrics */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Accessible focus indicators */
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+}
+
+/* Subtle, unobtrusive scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: 9999px;
+}
+html.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+}

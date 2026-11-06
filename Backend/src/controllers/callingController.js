@@ -11,7 +11,7 @@ import {
 
 export async function listProcesses(req, res, next) {
   try {
-    const { status, search, page = 1, limit = 20 } = req.query;
+    const { status, search, page = 1, limit = 5 } = req.query;
 
     const query = {};
 
@@ -34,8 +34,8 @@ export async function listProcesses(req, res, next) {
       query.purchaseId = { $in: matchingPurchases.map((p) => p._id) };
     }
 
-    const pageNum = parseInt(page, 10);
-    const limitNum = parseInt(limit, 10);
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.max(1, parseInt(limit, 10) || 5);
     const skip = (pageNum - 1) * limitNum;
 
     const [processes, total] = await Promise.all([

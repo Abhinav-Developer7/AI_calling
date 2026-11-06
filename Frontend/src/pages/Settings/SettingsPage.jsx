@@ -1,19 +1,58 @@
-import React, { useState } from 'react';
-import {
-  Settings,
-  ShieldCheck,
-  Clock,
-  PhoneForwarded,
-  Copy,
-  Check,
-  Bot,
-  ExternalLink,
-  Sparkles,
-} from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { apiClient } from '../../api/client';
+import { Copy, Check, Save, CheckCircle2, AlertCircle } from 'lucide-react';
 
 export function SettingsPage() {
   const [copied, setCopied] = useState(false);
-  const webhookUrl = `${window.location.origin}/api/v1/webhooks/voice-provider/events`;
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const [settings, setSettings] = useState({
+    storeName: 'Aurum Jewellery',
+    brandDisplayName: 'Aurum Jewellery',
+    branchName: 'Ernakulam Flagship Store',
+    callingHoursStart: '10:00',
+    callingHoursEnd: '20:00',
+    timezone: 'Asia/Kolkata',
+    retentionDays: 90,
+  });
+
+  const webhookUrl = `${window.location.origin}/api/v1/webhooks/vistara`;
+
+  useEffect(() => {
+    setLoading(true);
+    apiClient
+      .get('/settings')
+      .then((res) => {
+        if (res.data?.success && res.data.data) {
+          setSettings(res.data.data);
+        }
+      })
+      .catch(() => {
+        setErrorMsg('Failed to load store settings.');
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setSuccessMsg('');
+    setErrorMsg('');
+    try {
+      const res = await apiClient.put('/settings', settings);
+      if (res.data?.success) {
+        setSuccessMsg('Store settings saved successfully.');
+        setSettings(res.data.data);
+      }
+    } catch (err) {
+      setErrorMsg(err.response?.data?.message || err.message || 'Failed to update settings.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleCopyWebhook = () => {
     navigator.clipboard.writeText(webhookUrl);
@@ -22,161 +61,156 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-4xl font-sans pb-10">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">System & Calling Provider Settings</h1>
-        <p className="text-sm text-slate-500 mt-1">
-          Configure calling rules, telephony provider adapters (Retell AI / Vapi), and webhook integration
+        <h1 className="text-xl md:text-2xl font-bold text-ink tracking-tight">Settings & Configuration</h1>
+        <p className="text-xs text-ink-soft mt-0.5">
+          Store profile, TRAI calling window, telephony webhooks, and retention policy.
         </p>
       </div>
 
-      {/* Calling Delay & Retry Rules */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-6">
-        <div className="border-b border-slate-100 pb-4">
-          <h2 className="text-base font-semibold text-slate-800 flex items-center gap-2">
-            <Clock className="w-5 h-5 text-amber-500" /> Calling Policy & Safeguards
-          </h2>
-          <p className="text-xs text-slate-500 mt-1">Non-negotiable timing controls established by system policy</p>
+      {successMsg && (
+        <div className="p-3.5 bg-status-success-bg border border-emerald-500/20 text-status-success-ink rounded-2xl text-xs flex items-center gap-2.5 shadow-soft">
+          <CheckCircle2 className="w-4 h-4 shrink-0 stroke-[2]" />
+          <span>{successMsg}</span>
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
-          <div>
-            <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">
-              Initial Call Delay
-            </label>
-            <input
-              type="text"
-              readOnly
-              value="15 minutes post-purchase"
-              className="w-full bg-slate-100 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-700 font-medium"
-            />
-            <span className="text-[11px] text-slate-400 mt-1 block">Scheduled automatically upon bill generation</span>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">
-              Max Call Attempts
-            </label>
-            <input
-              type="text"
-              readOnly
-              value="2 attempts maximum"
-              className="w-full bg-slate-100 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-700 font-medium"
-            />
-            <span className="text-[11px] text-slate-400 mt-1 block">1 initial call + 1 permitted retry on busy/no-answer</span>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">
-              Permitted Calling Hours (IST)
-            </label>
-            <input
-              type="text"
-              readOnly
-              value="10:00 AM - 08:00 PM IST"
-              className="w-full bg-slate-100 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-700 font-medium"
-            />
-            <span className="text-[11px] text-slate-400 mt-1 block">Calls outside hours are shifted to 10:15 AM next morning</span>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">
-              Active Telephony Adapter
-            </label>
-            <input
-              type="text"
-              readOnly
-              value="Mock Provider (Dev) / Retell AI (Configured)"
-              className="w-full bg-slate-100 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-700 font-medium"
-            />
-            <span className="text-[11px] text-slate-400 mt-1 block">Toggle via VOICE_PROVIDER in Backend/.env</span>
-          </div>
+      )}
+      {errorMsg && (
+        <div className="p-3.5 bg-status-danger-bg border border-rose-500/20 text-status-danger-ink rounded-2xl text-xs flex items-center gap-2.5 shadow-soft">
+          <AlertCircle className="w-4 h-4 shrink-0 stroke-[2]" />
+          <span>{errorMsg}</span>
         </div>
-      </div>
+      )}
 
-      {/* Retell AI Voice Provider Guide */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-6">
-        <div className="border-b border-slate-100 pb-4 flex items-center justify-between">
+      {/* Store Profile & Calling Hours Form */}
+      <form onSubmit={handleSave} className="bg-surface rounded-[24px] shadow-soft border border-black/[0.04] dark:border-white/[0.06] p-6 space-y-6 text-xs">
+        <div className="border-b border-black/[0.04] dark:border-white/[0.06] pb-4 flex items-center justify-between">
           <div>
-            <h2 className="text-base font-semibold text-slate-800 flex items-center gap-2">
-              <Bot className="w-5 h-5 text-blue-600" /> Connecting to Retell AI Service
+            <h2 className="text-xs font-semibold text-ink uppercase tracking-wider">
+              Store Profile & Calling Hours
             </h2>
-            <p className="text-xs text-slate-500 mt-1">Follow these steps to enable live voice calling</p>
+            <p className="text-[11px] text-ink-soft mt-0.5">
+              Source of truth for store branding and legal outbound calling times.
+            </p>
           </div>
-          <a
-            href="https://retellai.com"
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center gap-1 text-xs text-blue-600 font-semibold hover:underline"
+          <button
+            type="submit"
+            disabled={saving}
+            className="flex items-center gap-2 px-5 py-2 bg-accent text-accent-ink font-semibold rounded-pill text-xs shadow-soft hover:brightness-105 active:scale-[0.98] transition cursor-pointer disabled:opacity-50"
           >
-            Retell Dashboard <ExternalLink className="w-3.5 h-3.5" />
-          </a>
+            <Save className="w-3.5 h-3.5 stroke-[2]" />
+            <span>{saving ? 'Saving...' : 'Save Settings'}</span>
+          </button>
         </div>
 
-        <div className="space-y-4 text-xs">
-          <div className="p-3 bg-slate-50 rounded-xl space-y-2">
-            <span className="font-bold text-slate-800 block">1. Inbound Webhook URL (Paste into Retell)</span>
-            <p className="text-slate-500 text-[11px]">
-              Set this URL in your Retell AI Dashboard under <strong>Settings &gt; Webhook URL</strong> to receive call lifecycle events and ratings:
-            </p>
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                readOnly
-                value={webhookUrl}
-                className="flex-1 bg-white border border-slate-200 rounded-lg p-2 font-mono text-[11px] text-slate-800"
-              />
-              <button
-                type="button"
-                onClick={handleCopyWebhook}
-                className="px-3 py-2 bg-slate-800 text-white hover:bg-slate-700 rounded-lg font-semibold flex items-center gap-1.5"
-              >
-                {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                <span>{copied ? 'Copied' : 'Copy'}</span>
-              </button>
-            </div>
-            <p className="text-[10px] text-slate-400">
-              * Note: For local development, use an ngrok or cloudflare tunnel URL (e.g. <code>https://your-ngrok.ngrok-free.app/api/v1/webhooks/voice-provider/events</code>).
-            </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-[11px] font-medium text-ink-soft mb-1.5">
+              Store Legal Name *
+            </label>
+            <input
+              type="text"
+              required
+              value={settings.storeName}
+              onChange={(e) => setSettings({ ...settings, storeName: e.target.value })}
+              className="w-full bg-surface-muted border border-black/[0.04] dark:border-white/[0.06] rounded-xl px-3.5 py-2.5 text-xs text-ink focus:outline-none focus:ring-1 focus:ring-accent"
+            />
           </div>
 
-          <div className="p-3 bg-slate-50 rounded-xl space-y-2">
-            <span className="font-bold text-slate-800 block">2. Configure Backend Credentials</span>
-            <p className="text-slate-500 text-[11px]">
-              Open <code>Backend/.env</code> and set the following:
-            </p>
-            <pre className="p-3 bg-slate-900 text-slate-100 rounded-lg font-mono text-[11px] overflow-x-auto">
-{`VOICE_PROVIDER=retell
-RETELL_API_KEY=your_retell_api_key_here
-RETELL_AGENT_ID=your_retell_agent_id_here
-RETELL_WEBHOOK_SECRET=your_retell_webhook_secret_here`}
-            </pre>
+          <div>
+            <label className="block text-[11px] font-medium text-ink-soft mb-1.5">
+              Brand Display Name (Spoken by AI Voice Agent) *
+            </label>
+            <input
+              type="text"
+              required
+              value={settings.brandDisplayName}
+              onChange={(e) => setSettings({ ...settings, brandDisplayName: e.target.value })}
+              className="w-full bg-surface-muted border border-black/[0.04] dark:border-white/[0.06] rounded-xl px-3.5 py-2.5 text-xs text-ink focus:outline-none focus:ring-1 focus:ring-accent"
+            />
           </div>
 
-          <div className="p-3 bg-slate-50 rounded-xl space-y-2">
-            <span className="font-bold text-slate-800 block">3. Voice Agent Prompt (Malayalam & English)</span>
-            <p className="text-slate-500 text-[11px]">
-              In your Retell Agent instructions, use this tested prompt for Kerala Malayalam & English:
-            </p>
-            <div className="p-3 bg-white border border-slate-200 rounded-lg text-slate-700 leading-relaxed max-h-48 overflow-y-auto font-mono text-[10px]">
-{`You are an AI assistant for Aurum Jewellery calling customer {{customer_name}} regarding their purchase of {{items_summary}} on invoice {{invoice_number}}.
-
-Language rules:
-- Greet in Malayalam: "Namaskaram {{customer_name}}, njan Aurum Jewellery-il ninnumulla AI assistant aanu. Thangalude recent purchase experience kurichu samsarikkan 2 minute samayam undo?"
-- If customer speaks English, switch smoothly to polite Indian English.
-- If customer speaks Malayalam or Manglish, speak natural Kerala Malayalam.
-
-Questions:
-1. Ask for overall shopping experience on a scale of 1 to 5: "Ningalude experience engane undayirunnu? 1 muthal 5 vare rating tharamo?"
-2. Ask 1 brief optional question about staff behavior or collection.
-3. If customer mentions any issue (e.g. stone loose, billing queue), acknowledge politely without making false promises or arguing.
-4. If customer says "don't call me again", apologize politely, confirm their number will be removed, and end call.
-
-Safeguards:
-- NEVER ask for OTP, PIN, bank details, or passwords.
-- NEVER promise discounts, refunds, or repairs.`}
-            </div>
+          <div>
+            <label className="block text-[11px] font-medium text-ink-soft mb-1.5">
+              Showroom Branch Reference *
+            </label>
+            <input
+              type="text"
+              required
+              value={settings.branchName}
+              onChange={(e) => setSettings({ ...settings, branchName: e.target.value })}
+              className="w-full bg-surface-muted border border-black/[0.04] dark:border-white/[0.06] rounded-xl px-3.5 py-2.5 text-xs text-ink focus:outline-none focus:ring-1 focus:ring-accent"
+            />
           </div>
+
+          <div>
+            <label className="block text-[11px] font-medium text-ink-soft mb-1.5">
+              Timezone
+            </label>
+            <input
+              type="text"
+              readOnly
+              value={settings.timezone}
+              className="w-full bg-surface-muted border border-black/[0.04] dark:border-white/[0.06] rounded-xl px-3.5 py-2.5 text-xs text-ink-soft opacity-70"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-medium text-ink-soft mb-1.5">
+              Calling Window Start (IST) *
+            </label>
+            <input
+              type="time"
+              required
+              value={settings.callingHoursStart}
+              onChange={(e) => setSettings({ ...settings, callingHoursStart: e.target.value })}
+              className="w-full bg-surface-muted border border-black/[0.04] dark:border-white/[0.06] rounded-xl px-3.5 py-2.5 text-xs text-ink font-mono focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+            <span className="text-[10px] text-ink-soft mt-1 block">TRAI permissible start time</span>
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-medium text-ink-soft mb-1.5">
+              Calling Window End (IST) *
+            </label>
+            <input
+              type="time"
+              required
+              value={settings.callingHoursEnd}
+              onChange={(e) => setSettings({ ...settings, callingHoursEnd: e.target.value })}
+              className="w-full bg-surface-muted border border-black/[0.04] dark:border-white/[0.06] rounded-xl px-3.5 py-2.5 text-xs text-ink font-mono focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+            <span className="text-[10px] text-ink-soft mt-1 block">TRAI permissible end time (20:00)</span>
+          </div>
+        </div>
+      </form>
+
+      {/* Telephony & Webhook Endpoints */}
+      <div className="bg-surface rounded-[24px] shadow-soft border border-black/[0.04] dark:border-white/[0.06] p-6 space-y-4 text-xs">
+        <div>
+          <h2 className="text-xs font-semibold text-ink uppercase tracking-wider mb-1">
+            Inbound Telephony Webhook Endpoint
+          </h2>
+          <p className="text-xs text-ink-soft">
+            Configure this URL in the Vistara AI or Retell dashboard to receive call completion webhooks and transcripts.
+          </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+          <input
+            type="text"
+            readOnly
+            value={webhookUrl}
+            className="flex-1 bg-surface-muted border border-black/[0.04] dark:border-white/[0.06] rounded-xl px-3.5 py-2.5 font-mono text-[11px] text-ink"
+          />
+          <button
+            type="button"
+            onClick={handleCopyWebhook}
+            className="px-5 py-2.5 bg-surface hover:bg-surface-muted border border-black/[0.04] dark:border-white/[0.06] rounded-pill text-ink font-semibold flex items-center justify-center gap-2 transition cursor-pointer shadow-soft"
+          >
+            {copied ? <Check className="w-3.5 h-3.5 text-status-success-ink" /> : <Copy className="w-3.5 h-3.5" />}
+            <span>{copied ? 'Copied' : 'Copy'}</span>
+          </button>
         </div>
       </div>
     </div>

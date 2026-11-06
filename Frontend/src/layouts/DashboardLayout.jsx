@@ -1,6 +1,9 @@
-import React from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import React, { useState, useEffect } from 'react';
+import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { IconSidebar } from '../components/layout/IconSidebar';
+import { Topbar } from '../components/layout/Topbar';
+import { AddPurchaseModal } from '../components/purchases/AddPurchaseModal';
+import { apiClient } from '../api/client';
 import {
   LayoutDashboard,
   ShoppingBag,
@@ -10,98 +13,144 @@ import {
   BarChart3,
   Settings,
   LogOut,
-  Gem,
+  X,
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
-const NAV_ITEMS = [
-  { path: '/', label: 'Dashboard', icon: LayoutDashboard },
+const MOBILE_NAV_ITEMS = [
+  { path: '/', label: 'Overview', icon: LayoutDashboard },
   { path: '/purchases', label: 'Purchases', icon: ShoppingBag },
-  { path: '/calling', label: 'AI Calling', icon: PhoneCall },
-  { path: '/feedback', label: 'Feedback', icon: Star },
+  { path: '/calling', label: 'Calling Queue', icon: PhoneCall },
+  { path: '/feedback', label: 'Feedback Records', icon: Star },
   { path: '/complaints', label: 'Complaints', icon: AlertCircle },
   { path: '/reports', label: 'Reports', icon: BarChart3 },
   { path: '/settings', label: 'Settings', icon: Settings },
 ];
 
 export function DashboardLayout() {
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
+  const [storeSettings, setStoreSettings] = useState({
+    storeName: 'Aurum Jewellery',
+    brandDisplayName: 'Aurum Jewellery',
+    branchName: 'Ernakulam Flagship Store',
+    callingHoursStart: '10:00',
+    callingHoursEnd: '20:00',
+  });
+
+  useEffect(() => {
+    apiClient
+      .get('/settings')
+      .then((res) => {
+        if (res.data?.success && res.data.data) {
+          setStoreSettings(res.data.data);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   return (
-    <div className="flex h-screen bg-slate-100 text-slate-800">
-      {/* Sidebar */}
-      <aside className="w-64 flex flex-col bg-slate-900 text-white shadow-xl">
-        {/* Brand Header */}
-        <div className="flex items-center gap-3 px-6 py-5 border-b border-slate-800">
-          <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">
-            <Gem className="w-6 h-6" />
-          </div>
-          <div>
-            <h1 className="font-bold text-sm tracking-wide text-white">AURUM JEWELLERY</h1>
-            <p className="text-xs text-slate-400">AI Feedback Calling</p>
-          </div>
-        </div>
+    <div className="h-screen bg-frame p-2 sm:p-3 lg:p-4 flex gap-2.5 sm:gap-3.5 lg:gap-4 overflow-hidden font-sans">
+      {/* Slim 72px Charcoal Icon-Only Sidebar (Desktop) */}
+      <IconSidebar />
 
-        {/* Navigation */}
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {NAV_ITEMS.map((item) => {
-            const Icon = item.icon;
-            return (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                end={item.path === '/'}
-                className={({ isActive }) =>
-                  `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'bg-amber-500 text-slate-950 font-semibold shadow-sm'
-                      : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                  }`
-                }
-              >
-                <Icon className="w-4 h-4 shrink-0" />
-                <span>{item.label}</span>
-              </NavLink>
-            );
-          })}
-        </nav>
+      {/* Mobile Slide-Over Drawer */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
 
-        {/* User Profile & Logout */}
-        <div className="p-4 border-t border-slate-800 bg-slate-950/50">
-          <div className="flex items-center justify-between">
-            <div className="truncate pr-2">
-              <p className="text-xs font-semibold text-white truncate">{user?.name || 'Administrator'}</p>
-              <p className="text-[11px] text-slate-400 capitalize">{user?.role || 'Admin'}</p>
+      <div
+        className={`fixed inset-y-0 left-0 w-64 bg-frame-dark p-5 z-50 transform md:hidden transition-transform duration-200 ease-in-out text-white flex flex-col justify-between ${
+          mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <div>
+          <div className="flex items-center justify-between pb-5 border-b border-white/10 mb-4">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-accent text-accent-ink font-bold flex items-center justify-center text-xs">
+                AJ
+              </div>
+              <span className="font-semibold text-sm tracking-tight">Aurum Jewellery</span>
             </div>
             <button
-              onClick={logout}
-              title="Log out"
-              className="p-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-800 transition"
+              onClick={() => setMobileMenuOpen(false)}
+              className="p-1 rounded-lg text-ink-soft hover:text-white"
             >
-              <LogOut className="w-4 h-4" />
+              <X className="w-5 h-5" />
             </button>
           </div>
+
+          <nav className="space-y-1.5">
+            {MOBILE_NAV_ITEMS.map((item) => {
+              const Icon = item.icon;
+              return (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  end={item.path === '/'}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium transition ${
+                      isActive
+                        ? 'bg-frame-active text-white font-semibold'
+                        : 'text-ink-soft hover:text-white hover:bg-white/5'
+                    }`
+                  }
+                >
+                  <Icon className="w-4 h-4 stroke-[1.75]" />
+                  <span>{item.label}</span>
+                </NavLink>
+              );
+            })}
+          </nav>
         </div>
-      </aside>
 
-      {/* Main Content Area */}
-      <main className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-800">Jewellery Customer Feedback System</h2>
-          <div className="flex items-center gap-4 text-xs font-medium text-slate-500">
-            <span className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              Calling Service Active
-            </span>
-            <span className="text-slate-300">|</span>
-            <span>Timezone: Asia/Kolkata (IST)</span>
-          </div>
-        </header>
+        <button
+          onClick={logout}
+          className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs text-rose-400 hover:bg-rose-500/10 transition mt-auto"
+        >
+          <LogOut className="w-4 h-4" />
+          <span>Sign Out</span>
+        </button>
+      </div>
 
-        <div className="flex-1 overflow-y-auto p-8">
-          <Outlet />
+      {/* Main Inset Rounded Canvas */}
+      <main className="bg-app rounded-[22px] sm:rounded-[28px] lg:rounded-[32px] flex-1 flex flex-col min-w-0 overflow-hidden shadow-2xl relative h-full">
+        {/* Topbar inside canvas */}
+        <Topbar
+          storeInfo={storeSettings}
+          onToggleMobileMenu={() => setMobileMenuOpen(!mobileMenuOpen)}
+          mobileMenuOpen={mobileMenuOpen}
+        />
+
+        {/* Scrollable Main Viewport */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+          <React.Suspense
+            fallback={
+              <div className="flex items-center justify-center py-24 text-ink-soft">
+                <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+              </div>
+            }
+          >
+            <Outlet context={{ setIsPurchaseModalOpen, storeSettings }} />
+          </React.Suspense>
         </div>
       </main>
+
+      {/* Global Add Purchase & Call Modal */}
+      <AddPurchaseModal
+        isOpen={isPurchaseModalOpen}
+        onClose={() => setIsPurchaseModalOpen(false)}
+        onPurchaseCreated={() => {
+          setIsPurchaseModalOpen(false);
+          navigate('/purchases');
+        }}
+      />
     </div>
   );
 }
-
