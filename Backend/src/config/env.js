@@ -33,6 +33,10 @@ const envSchema = z.object({
   VISTARA_BASE_URL: z.string().optional(),
   VISTARA_WEBHOOK_TOKEN: z.string().optional(),
   VISTARA_CALL_TYPE: z.string().optional(),
+  VISTARA_AGENT_lIST_URL: z.string().optional(),
+  VISTARA_AGENT_LIST_URL: z.string().optional(),
+  VISTARA_AGENT_UPDATE_URL: z.string().optional(),
+  VISTARA_AGENT_CREATE_URL: z.string().optional(),
 
   CALLING_HOURS_START: z.string().default('10:00'),
   CALLING_HOURS_END: z.string().default('20:00'),

@@ -9,4 +9,5 @@ export { Customer } from './Customer.js';
 export { StoreSettings } from './StoreSettings.js';
 export { OptOutRegistry } from './OptOutRegistry.js';
 export { AuditLog } from './AuditLog.js';
+export { Agent } from './Agent.js';
 

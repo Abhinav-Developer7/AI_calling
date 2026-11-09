@@ -1,9 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '../../api/client';
-import { Copy, Check, Save, CheckCircle2, AlertCircle } from 'lucide-react';
+import {
+  Save,
+  CheckCircle2,
+  AlertCircle,
+  Bot,
+  UserPlus,
+  Edit3,
+} from 'lucide-react';
+import { AddAgentModal } from '../../components/agents/AddAgentModal';
 
 export function SettingsPage() {
-  const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
@@ -17,17 +24,46 @@ export function SettingsPage() {
     callingHoursEnd: '20:00',
     timezone: 'Asia/Kolkata',
     retentionDays: 90,
+    aiAgentName: 'Meera',
+    aiVoiceLanguage: 'English',
+    aiAgentTone: 'Voice: meera',
+    aiAgentGreeting: 'Namaskaram! This is Meera from Aurum Jewellery regarding your recent jewellery purchase.',
   });
 
-  const webhookUrl = `${window.location.origin}/api/v1/webhooks/vistara`;
+  // Dedicated Agent Modal State
+  const [isAgentModalOpen, setIsAgentModalOpen] = useState(false);
+  const [agentModalMode, setAgentModalMode] = useState('add');
+  const [currentAgent, setCurrentAgent] = useState(null);
+  const [agentsList, setAgentsList] = useState([]);
 
   useEffect(() => {
     setLoading(true);
-    apiClient
-      .get('/settings')
-      .then((res) => {
-        if (res.data?.success && res.data.data) {
-          setSettings(res.data.data);
+    Promise.allSettled([
+      apiClient.get('/settings'),
+      apiClient.get('/agents'),
+    ])
+      .then(([settingsRes, agentsRes]) => {
+        if (
+          settingsRes.status === 'fulfilled' &&
+          settingsRes.value.data?.success &&
+          settingsRes.value.data.data
+        ) {
+          setSettings((prev) => ({
+            ...prev,
+            ...settingsRes.value.data.data,
+          }));
+        }
+
+        if (
+          agentsRes.status === 'fulfilled' &&
+          agentsRes.value.data?.success &&
+          Array.isArray(agentsRes.value.data.agents) &&
+          agentsRes.value.data.agents.length > 0
+        ) {
+          const agents = agentsRes.value.data.agents;
+          setAgentsList(agents);
+          const active = agents.find((a) => a.isActive) || agents[0];
+          setCurrentAgent(active);
         }
       })
       .catch(() => {
@@ -45,7 +81,7 @@ export function SettingsPage() {
       const res = await apiClient.put('/settings', settings);
       if (res.data?.success) {
         setSuccessMsg('Store settings saved successfully.');
-        setSettings(res.data.data);
+        setSettings((prev) => ({ ...prev, ...res.data.data }));
       }
     } catch (err) {
       setErrorMsg(err.response?.data?.message || err.message || 'Failed to update settings.');
@@ -54,10 +90,53 @@ export function SettingsPage() {
     }
   };
 
-  const handleCopyWebhook = () => {
-    navigator.clipboard.writeText(webhookUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleOpenAddAgent = () => {
+    setAgentModalMode('add');
+    setIsAgentModalOpen(true);
+  };
+
+  const handleOpenEditAgent = () => {
+    setAgentModalMode('edit');
+    setIsAgentModalOpen(true);
+  };
+
+  const handleAgentSaved = (savedAgent) => {
+    setCurrentAgent(savedAgent);
+    if (savedAgent) {
+      setAgentsList((prev) => {
+        const idx = prev.findIndex((a) => a._id === savedAgent._id);
+        if (idx >= 0) {
+          const copy = [...prev];
+          copy[idx] = savedAgent;
+          return copy;
+        }
+        return [savedAgent, ...prev];
+      });
+    }
+    setSettings((prev) => ({
+      ...prev,
+      aiAgentName: savedAgent.name,
+      aiVoiceLanguage: savedAgent.language,
+      aiAgentGreeting: savedAgent.first_message,
+      aiAgentTone: `Voice: ${savedAgent.voice}`,
+    }));
+    setSuccessMsg(
+      agentModalMode === 'add'
+        ? `New Voice Agent "${savedAgent.name}" created and set as active caller.`
+        : `Voice Agent "${savedAgent.name}" configuration updated successfully.`
+    );
+  };
+
+  const agentForEditing = currentAgent || {
+    name: settings.aiAgentName || 'Meera',
+    language: settings.aiVoiceLanguage || 'English',
+    voice: 'meera',
+    first_message:
+      settings.aiAgentGreeting ||
+      `Namaskaram! This is ${settings.aiAgentName || 'Meera'} from ${settings.brandDisplayName || 'Aurum Jewellery'} regarding your recent jewellery purchase.`,
+    agent_prompt:
+      'You are an AI customer feedback assistant for Aurum Jewellery. Confirm if the customer has 1 minute, ask for rating 1 to 5, collect comments, and thank them warmly.',
+    max_call: 5,
   };
 
   return (
@@ -83,7 +162,10 @@ export function SettingsPage() {
       )}
 
       {/* Store Profile & Calling Hours Form */}
-      <form onSubmit={handleSave} className="bg-surface rounded-[24px] shadow-soft border border-black/[0.04] dark:border-white/[0.06] p-6 space-y-6 text-xs">
+      <form
+        onSubmit={handleSave}
+        className="bg-surface rounded-[24px] shadow-soft border border-black/[0.04] dark:border-white/[0.06] p-6 space-y-6 text-xs"
+      >
         <div className="border-b border-black/[0.04] dark:border-white/[0.06] pb-4 flex items-center justify-between">
           <div>
             <h2 className="text-xs font-semibold text-ink uppercase tracking-wider">
@@ -183,36 +265,62 @@ export function SettingsPage() {
             <span className="text-[10px] text-ink-soft mt-1 block">TRAI permissible end time (20:00)</span>
           </div>
         </div>
+
+        {/* Bottom of Store Profile Div: AI Agent Controls (Add Agent & Edit Agent) */}
+        <div className="pt-5 border-t border-black/[0.04] dark:border-white/[0.06] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-accent/20 text-accent-ink font-bold flex items-center justify-center shrink-0">
+              <Bot className="w-5 h-5 text-accent-ink" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-ink text-sm">
+                  {currentAgent?.name || settings.aiAgentName || 'Meera'}
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-pill text-[10px] font-semibold bg-status-success-bg text-status-success-ink">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                  Active Voice Agent
+                </span>
+              </div>
+              <p className="text-[11px] text-ink-soft mt-0.5">
+                Voice: <span className="capitalize">{currentAgent?.voice || 'Meera'}</span> · Language: {currentAgent?.language || settings.aiVoiceLanguage || 'English'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2.5 shrink-0">
+            {/* Button 1: Add Agent */}
+            <button
+              type="button"
+              onClick={handleOpenAddAgent}
+              className="flex items-center gap-1.5 px-4 py-2 bg-surface hover:bg-surface-muted border border-black/[0.08] dark:border-white/[0.1] text-ink font-semibold rounded-pill text-xs shadow-soft transition cursor-pointer"
+            >
+              <UserPlus className="w-3.5 h-3.5 stroke-[2] text-ink-soft" />
+              <span>Add Agent</span>
+            </button>
+
+            {/* Button 2: Edit Agent */}
+            <button
+              type="button"
+              onClick={handleOpenEditAgent}
+              className="flex items-center gap-1.5 px-4 py-2 bg-accent hover:bg-accent-hover text-accent-ink font-semibold rounded-pill text-xs shadow-soft transition cursor-pointer"
+            >
+              <Edit3 className="w-3.5 h-3.5 stroke-[2.2]" />
+              <span>Edit Agent</span>
+            </button>
+          </div>
+        </div>
       </form>
 
-      {/* Telephony & Webhook Endpoints */}
-      <div className="bg-surface rounded-[24px] shadow-soft border border-black/[0.04] dark:border-white/[0.06] p-6 space-y-4 text-xs">
-        <div>
-          <h2 className="text-xs font-semibold text-ink uppercase tracking-wider mb-1">
-            Inbound Telephony Webhook Endpoint
-          </h2>
-          <p className="text-xs text-ink-soft">
-            Configure this URL in the Vistara AI or Retell dashboard to receive call completion webhooks and transcripts.
-          </p>
-        </div>
-
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
-          <input
-            type="text"
-            readOnly
-            value={webhookUrl}
-            className="flex-1 bg-surface-muted border border-black/[0.04] dark:border-white/[0.06] rounded-xl px-3.5 py-2.5 font-mono text-[11px] text-ink"
-          />
-          <button
-            type="button"
-            onClick={handleCopyWebhook}
-            className="px-5 py-2.5 bg-surface hover:bg-surface-muted border border-black/[0.04] dark:border-white/[0.06] rounded-pill text-ink font-semibold flex items-center justify-center gap-2 transition cursor-pointer shadow-soft"
-          >
-            {copied ? <Check className="w-3.5 h-3.5 text-status-success-ink" /> : <Copy className="w-3.5 h-3.5" />}
-            <span>{copied ? 'Copied' : 'Copy'}</span>
-          </button>
-        </div>
-      </div>
+      {/* Dedicated Separate Agent Adding & Editing Form Modal */}
+      <AddAgentModal
+        isOpen={isAgentModalOpen}
+        onClose={() => setIsAgentModalOpen(false)}
+        mode={agentModalMode}
+        initialAgent={agentForEditing}
+        agentsList={agentsList}
+        onAgentSaved={handleAgentSaved}
+      />
     </div>
   );
 }

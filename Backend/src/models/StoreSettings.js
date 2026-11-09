@@ -66,6 +66,16 @@ const storeSettingsSchema = new mongoose.Schema(
       trim: true,
       default: 'Malayalam & English',
     },
+    aiAgentTone: {
+      type: String,
+      trim: true,
+      default: 'Polite & Warm (Kerala Malayalam)',
+    },
+    aiAgentGreeting: {
+      type: String,
+      trim: true,
+      default: 'Namaskaram! This is Anjali from Aurum Jewellery regarding your recent jewellery purchase.',
+    },
     retentionDays: {
       type: Number,
       default: 180, // DPDP compliance: 180 days default customer recording retention

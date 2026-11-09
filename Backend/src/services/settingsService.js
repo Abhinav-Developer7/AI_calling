@@ -32,6 +32,8 @@ export async function getStoreSettings() {
       retryDelayMinutes: env.RETRY_DELAY_MINUTES || 30,
       aiAgentName: 'Anjali',
       aiVoiceLanguage: 'Malayalam & English',
+      aiAgentTone: 'Polite & Warm (Kerala Malayalam)',
+      aiAgentGreeting: 'Namaskaram! This is Anjali from Aurum Jewellery regarding your recent jewellery purchase.',
       retentionDays: 180,
     });
     settings = created.toObject();
@@ -59,6 +61,8 @@ export async function updateStoreSettings(updates) {
     'retryDelayMinutes',
     'aiAgentName',
     'aiVoiceLanguage',
+    'aiAgentTone',
+    'aiAgentGreeting',
     'retentionDays',
   ];
 

@@ -15,6 +15,7 @@ import complaintRoutes from './routes/complaintRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
 import settingsRoutes from './routes/settingsRoutes.js';
+import agentRoutes from './routes/agentRoutes.js';
 
 export const app = express();
 
@@ -57,6 +58,7 @@ app.use('/api/v1/complaints', complaintRoutes);
 app.use('/api/v1/dashboard', dashboardRoutes);
 app.use('/api/v1/reports', reportRoutes);
 app.use('/api/v1/settings', settingsRoutes);
+app.use('/api/v1/agents', agentRoutes);
 
 // Centralized error handler
 app.use(errorHandler);
